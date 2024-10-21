@@ -1,0 +1,5 @@
+LIBRARY TopMostDll.dll
+
+EXPORTS
+InstallHook
+UninstallHook
