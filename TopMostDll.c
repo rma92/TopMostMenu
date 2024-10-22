@@ -1,7 +1,7 @@
 #include <windows.h>
 #include <stdio.h>
 
-#define ID_ALWAYS_ON_TOP 1 // ID for the Always on Top menu item
+#define ID_ALWAYS_ON_TOP 0x1000 // ID for the Always on Top menu item
 
 HINSTANCE hInst;
 HMENU hSysMenu;
@@ -9,6 +9,8 @@ HMENU hSysMenu;
 // Function to toggle the "Always on Top" state
 void ToggleAlwaysOnTop(HWND hwnd) {
     LONG_PTR style = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+    LPCSTR buf = "Chicken!";
+    SetWindowTextA(hwnd, buf);
     if (style & WS_EX_TOPMOST) {
         SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -20,7 +22,24 @@ void ToggleAlwaysOnTop(HWND hwnd) {
 
 // Window procedure hook function
 LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode == HC_ACTION) {
+    if (nCode == HCBT_SYSCOMMAND)
+    {
+      char buf[255];
+      wsprintfA(buf, "wParam: 0x%X lParam: 0x%X\r\n", wParam, lParam);
+      OutputDebugString( buf );
+      if( wParam == SC_MOVE )
+      {
+        
+      }
+      else if( wParam == ID_ALWAYS_ON_TOP )
+      {
+        //MessageBoxA(0, "A", "Move", 0);
+        HWND hwnd = GetForegroundWindow();
+        ToggleAlwaysOnTop(hwnd);
+        return 0;
+      }
+    }
+    else if (nCode == HC_ACTION) {
         CWPSTRUCT *pwp = (CWPSTRUCT *)lParam;
         if (pwp->message == WM_CREATE) {
             // Add "Always on Top" to the system menu when the window is created
@@ -29,20 +48,12 @@ LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
                 AppendMenu(hSysMenu, MF_STRING, ID_ALWAYS_ON_TOP, "Always on Top");
             }
         }
-        else if (pwp->message == WM_SYSCOMMAND) {
-            MessageBoxA(0, "hi", "hi", 0);
-          
-            // Handle the "Always on Top" click
-            if ((wParam & 0xFFF0) == ID_ALWAYS_ON_TOP) {
-                ToggleAlwaysOnTop(pwp->hwnd);
-                return 0; // Return 0 to indicate message was processed
-            }
-        }
     }
     return CallNextHookEx(NULL, nCode, wParam, lParam);
 }
 
-HHOOK hHook = NULL;
+HHOOK hHookCbt = NULL;
+HHOOK hHookWnd = NULL;
 
 // DLL entry point
 BOOL APIENTRY DllMain(HINSTANCE hInstance, DWORD reason, LPVOID lpReserved) {
@@ -54,8 +65,9 @@ BOOL APIENTRY DllMain(HINSTANCE hInstance, DWORD reason, LPVOID lpReserved) {
 
 // Install the hook
 __declspec(dllexport) void InstallHook() {
-    hHook = SetWindowsHookEx(WH_CALLWNDPROC, HookProc, hInst, 0);
-    if (hHook) {
+    hHookCbt = SetWindowsHookEx(WH_CBT, HookProc, hInst, 0);
+    hHookWnd = SetWindowsHookEx(WH_CALLWNDPROC, HookProc, hInst, 0);
+    if (hHookCbt && hHookWnd) {
         MessageBox(NULL, "Hook installed!", "Info", MB_OK);
     } else {
         MessageBox(NULL, "Failed to install hook!", "Error", MB_OK);
@@ -64,9 +76,11 @@ __declspec(dllexport) void InstallHook() {
 
 // Uninstall the hook
 __declspec(dllexport) void UninstallHook() {
-    if (hHook) {
-        UnhookWindowsHookEx(hHook);
-        hHook = NULL;
+    if (hHookWnd || hHookCbt) {
+        UnhookWindowsHookEx(hHookWnd);
+        UnhookWindowsHookEx(hHookCbt);
+        hHookCbt = NULL;
+        hHookWnd = NULL;
         MessageBox(NULL, "Hook uninstalled!", "Info", MB_OK);
     }
 }
