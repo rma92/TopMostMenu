@@ -9,8 +9,8 @@ HMENU hSysMenu;
 // Function to toggle the "Always on Top" state
 void ToggleAlwaysOnTop(HWND hwnd) {
     LONG_PTR style = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
-    LPCSTR buf = "Chicken!";
-    SetWindowTextA(hwnd, buf);
+    //LPCSTR buf = "Chicken!";
+    //SetWindowTextA(hwnd, buf);
     if (style & WS_EX_TOPMOST) {
         SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -22,8 +22,10 @@ void ToggleAlwaysOnTop(HWND hwnd) {
 
 // Window procedure hook function
 LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    //CBTProc
     if (nCode == HCBT_SYSCOMMAND)
     {
+      HWND hwnd = GetForegroundWindow();
       char buf[255];
       wsprintfA(buf, "wParam: 0x%X lParam: 0x%X\r\n", wParam, lParam);
       OutputDebugString( buf );
@@ -34,19 +36,44 @@ LRESULT CALLBACK HookProc(int nCode, WPARAM wParam, LPARAM lParam) {
       else if( wParam == ID_ALWAYS_ON_TOP )
       {
         //MessageBoxA(0, "A", "Move", 0);
-        HWND hwnd = GetForegroundWindow();
         ToggleAlwaysOnTop(hwnd);
         return 0;
       }
+      else
+      {
+      }
     }
+    //WndProc
     else if (nCode == HC_ACTION) {
         CWPSTRUCT *pwp = (CWPSTRUCT *)lParam;
-        if (pwp->message == WM_CREATE) {
-            // Add "Always on Top" to the system menu when the window is created
-            hSysMenu = GetSystemMenu(pwp->hwnd, FALSE);
-            if (hSysMenu) {
-                AppendMenu(hSysMenu, MF_STRING, ID_ALWAYS_ON_TOP, "Always on Top");
+        switch (pwp->message) {
+          case WM_CREATE:
+          {
+            break;
+          }
+          case WM_INITMENU:
+          {
+            HMENU hSysMenu = GetSystemMenu(pwp->hwnd, FALSE);
+            if( hSysMenu != NULL && GetMenuState(hSysMenu, ID_ALWAYS_ON_TOP, MF_BYCOMMAND) == -1 )
+            {
+              AppendMenu( hSysMenu, MF_STRING, ID_ALWAYS_ON_TOP, "Always On Top");
             }
+            break;
+          }
+          case WM_UNINITMENUPOPUP:
+          {
+            HMENU hSysMenu = GetSystemMenu(pwp->hwnd, FALSE);
+            if( hSysMenu != NULL && GetMenuState(hSysMenu, ID_ALWAYS_ON_TOP, MF_BYCOMMAND) == -1 )
+            {
+              DeleteMenu( hSysMenu, ID_ALWAYS_ON_TOP, MF_BYCOMMAND);
+            }
+            break;
+          }
+
+          case WM_SYSCOMMAND:
+          {
+            break;
+          }
         }
     }
     return CallNextHookEx(NULL, nCode, wParam, lParam);
